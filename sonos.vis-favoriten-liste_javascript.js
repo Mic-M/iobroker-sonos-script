@@ -9,7 +9,7 @@
  * ---------------------------
  * Quelle: https://github.com/Mic-M/iobroker.sonos.vis-favoriten-liste
  * Autor: Mic (ioBroker) | Mic-M (github)
- * Support: <Link folgt>
+ * Support: https://forum.iobroker.net/topic/24743/vorlage-sonos-favoriten-in-vis
  * Change log:
  * 0.1 - initial version
  ******************************************************************************/
