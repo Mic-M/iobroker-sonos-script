@@ -1,0 +1,45 @@
+/***************************************************
+                     Sonos
+****************************************************/
+
+/*************
+ Springt immer zu aktuellem Song
+ Siehe: https://forum.iobroker.net/viewtopic.php?f=30&t=18222#p196640
+ ************/
+.mSonosFavorites > .vis-widget-body {
+    position: absolute; /*Wichtig, muss absolute sein */
+    width: 325px; /* hier deine Breite von deinem Widget */
+    height: 490px; /* hier deine Höhe von deinem Widget */
+    overflow-y: scroll; /* hier wird der Container zu einem scrollbaren Bereich */
+}
+
+
+/*************
+ Playlist (Favoriten)
+ ************/
+/* Nicht ausgewählte Items */
+#vis_container .favoriteSonosTitle:not(#currentSonosFavorite) {
+    color: #fff;
+}
+
+/* Ausgewählter Favorit */
+#vis_container #currentSonosFavorite {
+    color: #ffd71a;
+}
+
+
+
+/*************
+ Längere Texte abschneiden
+ ************/
+    #vis_container .mSonosFavorites table {
+        table-layout: fixed;
+        width: 300px; /* hier deine Breite von deinem Widget, minus etwa 25 Pixel */
+    }
+    #vis_container .mSonosFavorites td div {
+       overflow: hidden;
+       text-overflow: ellipsis;
+       white-space: nowrap;
+       width: 100%;
+    }
+
