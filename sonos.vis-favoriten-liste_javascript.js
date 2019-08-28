@@ -23,7 +23,7 @@
 const STATE_SONOS = 'sonos.0.root.192_168_0_12';
 
 // Kompletter Datenpunkt-Pfad, in dem die HTML-Ausgabe für VIS abgelegt wird.
-const STATE_FAVS_HTML = 'javascript.'+ instance + '.' + 'Sonos.Music.favoriteListHtml';
+const STATE_FAVS_HTML = 'javascript.'+ instance + '.' + 'Sonos.Control.Music.favoriteListHtml';
 
 // Favoriten-Liste alphabetisch sortieren? true = ja, false = nein
 const SORT_LIST = true;
