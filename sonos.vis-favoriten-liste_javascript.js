@@ -11,6 +11,7 @@
  * Autor: Mic (ioBroker) | Mic-M (github)
  * Support: https://forum.iobroker.net/topic/24743/vorlage-sonos-favoriten-in-vis
  * Change log:
+ * 0.2 - Fix: added missing function isLikeEmpty()
  * 0.1 - initial version
  ******************************************************************************/
 
@@ -180,4 +181,26 @@ function arraySortCaseInsensitive(arrayInput) {
         return a.toLowerCase().localeCompare(b.toLowerCase());
     });
     return arrayResult;
+}
+
+/**
+ * Checks if Array or String is not undefined, null or empty.
+ * @param inputVar - Input Array or String, Number, etc.
+ * @return true if it is undefined/null/empty, false if it contains value(s)
+ * Array or String containing just whitespaces or >'< or >"< is considered empty
+ */
+function isLikeEmpty(inputVar) {
+    if (typeof inputVar !== 'undefined' && inputVar !== null) {
+        let strTemp = JSON.stringify(inputVar);
+        strTemp = strTemp.replace(/\s+/g, ''); // remove all whitespaces
+        strTemp = strTemp.replace(/\"+/g, "");  // remove all >"<
+        strTemp = strTemp.replace(/\'+/g, "");  // remove all >'<
+        if (strTemp !== '') {
+            return false;
+        } else {
+            return true;
+        }
+    } else {
+        return true;
+    }
 }
