@@ -1,3 +1,3 @@
-# Sonos-Favoriten in VIS zur Auswahl einzelner Favoriten
+# ioBroker Sonos-Script als Erweiterung des Sonos-Adapters
 
-See: https://forum.iobroker.net/topic/24743/vorlage-sonos-favoriten-in-vis
+See: https://forum.iobroker.net/topic/24743/
