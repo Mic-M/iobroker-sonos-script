@@ -4,7 +4,7 @@
  * mit dem SONOS-Adapter (https://github.com/ioBroker/ioBroker.sonos).
 
  * ---------------------------
- * Quelle: https://github.com/Mic-M/iobroker.sonos.vis-favoriten-liste
+ * Quelle: https://github.com/Mic-M/iobroker.sonos-script
  * Autor: Mic (ioBroker) | Mic-M (github)
  * Support: https://forum.iobroker.net/topic/24743/
  * Change log:
