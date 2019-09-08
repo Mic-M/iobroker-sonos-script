@@ -8,6 +8,7 @@
  * Autor: Mic (ioBroker) | Mic-M (github)
  * Support: https://forum.iobroker.net/topic/24743/
  * Change log:
+ * 1.1 + On script start, push all Sonos favorites into custom favorites initially
  * 1.0 + Major release, added several additional functions and improvements
  * 0.3 + Create states for each Sonos device automatically
  *     + New state 'allStop' to stop all Sonos devices
@@ -63,8 +64,9 @@ const MAX_VOLUME = 80;
  * Einstellungen: Beim Abspielen immer Sonos-Geräte als Gruppe hinzufügen
  ****************************************************************************************/
 // Hiermit kann man Sonos-Geräte definieren, zu denen immer beim Abspielen weitere Geräte
-// als Gruppe hinzugefügt werden. Wer das gar nicht möchte, einfach GROUP_ON_PLAY auf false setzen.
-const GROUP_ON_PLAY = true;
+// als Gruppe hinzugefügt werden. 
+// Zum Einschalten: auf true setzen.
+const GROUP_ON_PLAY = false;
 
 // Falls GROUP_ON_PLAY = false, fann kann man folgendes ignorieren.
 // Es können beliebig viele Zeilen hinzugefügt werden.
@@ -72,8 +74,8 @@ const GROUP_ON_PLAY = true;
 // channelsToAdd: Hier Geräte eintragen, welche zum ersten Gerät als Gruppe hinzugefügt werden sollen
 //               Außerdem unter volumeAdjust das Volumen gegenüber dem channelMain nach oben oder unten anpassen.
 const GROUP_ON_PLAY_DEVICES = [
-    {channelMain: '10_10_0_107', channelsToAdd: [{channel:'10_10_0_130', volumeAdjust:-3}]}, 
-//  {channelMain: '10_10_0_107', channelsToAdd: [{channel:'192_168_10_25', volumeAdjust:0}, {channel:'192_168_10_26', volumeAdjust:0}]}, 
+    {channelMain: '192_168_10_5', channelsToAdd: [{channel:'192_168_10_7', volumeAdjust:-3}]}, 
+    {channelMain: '192_168_10_10', channelsToAdd: [{channel:'192_168_10_25', volumeAdjust:-2}, {channel:'192_168_10_26', volumeAdjust:0}]}, 
 ];
 
 
@@ -115,22 +117,31 @@ function init() {
 
         for (let lpChannel of SONOS_CHANNELS) {
 
-            let sonosFavsString = getState(sonosPath(lpChannel) + '.favorites_list').val;
-            let customFavsString = getState(scriptPath(lpChannel) + '.customFavoriteList').val;
+            let sonosFavsArray = getState(sonosPath(lpChannel) + '.favorites_list').val.split(', ')
+            let customFavsArray = getState(scriptPath(lpChannel) + '.customFavoriteList').val.split(';');
+
+            // If custom favorites list is empty, we push all Sonos Favorites into it in the beginning.
+            if (isLikeEmpty(customFavsArray)) {
+                let customFavsArray = [...sonosFavsArray]; // copy array
+                if (SORT_LIST) customFavsArray = arraySortCaseInsensitive(customFavsArray);
+                setState(scriptPath(lpChannel) + '.customFavoriteList', customFavsArray.join(';'));                
+            }
 
             // Refresh global HTML playlist initially
-            refreshFavoritesHtmlList(lpChannel, sonosFavsString.split(', '), scriptPath(lpChannel) + '.sonosFavoriteListHtml');
+            refreshFavoritesHtmlList(lpChannel, sonosFavsArray, scriptPath(lpChannel) + '.sonosFavoriteListHtml');
 
             // Refresh custom HTML playlist initially
-            refreshFavoritesHtmlList(lpChannel, customFavsString.split(';'), scriptPath(lpChannel) + '.customFavoriteListHtml');
+            refreshFavoritesHtmlList(lpChannel, customFavsArray, scriptPath(lpChannel) + '.customFavoriteListHtml');
 
             // Refresh Configuration HTML
             refreshConfigurationHtml(lpChannel);
 
-            // Clean Custom Favorites List, if Sonos Favorite was deleted.
-            // We perfom this also in the beginning.
             setTimeout(function(){
+
+                // Clean Custom Favorites List, if Sonos Favorite was deleted.
+                // We perfom this also in the beginning.
                 cleanCustomFavoritesList(lpChannel);
+
             }, 2000);
 
         }
@@ -786,9 +797,10 @@ function arraySortCaseInsensitive(arrayInput) {
 
 /**
  * Checks if Array or String is not undefined, null or empty.
+ * 08-Sep-2019: added check for [ and ] to also catch arrays with empty strings.
  * @param inputVar - Input Array or String, Number, etc.
  * @return true if it is undefined/null/empty, false if it contains value(s)
- * Array or String containing just whitespaces or >'< or >"< is considered empty
+ * Array or String containing just whitespaces or >'< or >"< or >[< or >]< is considered empty
  */
 function isLikeEmpty(inputVar) {
     if (typeof inputVar !== 'undefined' && inputVar !== null) {
@@ -796,6 +808,8 @@ function isLikeEmpty(inputVar) {
         strTemp = strTemp.replace(/\s+/g, ''); // remove all whitespaces
         strTemp = strTemp.replace(/\"+/g, "");  // remove all >"<
         strTemp = strTemp.replace(/\'+/g, "");  // remove all >'<
+        strTemp = strTemp.replace(/\[+/g, "");  // remove all >[<
+        strTemp = strTemp.replace(/\]+/g, "");  // remove all >]<
         if (strTemp !== '') {
             return false;
         } else {
