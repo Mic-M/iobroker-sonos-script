@@ -8,6 +8,9 @@
  * Autor: Mic (ioBroker) | Mic-M (github)
  * Support: https://forum.iobroker.net/topic/24743/
  * Change log:
+ * 1.2 + Use new Sonos adapter state (since 2.0.0, pull request 55) 'favorites_list_array' to allow comma 
+ *       in favorite name, see https://github.com/ioBroker/ioBroker.sonos/pull/55
+ *     + Replaced state 'customFavoriteList' with 'customFavoriteListArray', to allow semicolon in fav name
  * 1.1 + On script start, push all Sonos favorites into custom favorites initially
  * 1.0 + Major release, added several additional functions and improvements
  * 0.3 + Create states for each Sonos device automatically
@@ -117,14 +120,14 @@ function init() {
 
         for (let lpChannel of SONOS_CHANNELS) {
 
-            let sonosFavsArray = getState(sonosPath(lpChannel) + '.favorites_list').val.split(', ')
-            let customFavsArray = getState(scriptPath(lpChannel) + '.customFavoriteList').val.split(';');
+            let sonosFavsArray = sonosFavoritesArray(lpChannel);
+            let customFavsArray = getState(scriptPath(lpChannel) + '.customFavoriteListArray').val;
 
             // If custom favorites list is empty, we push all Sonos Favorites into it in the beginning.
             if (isLikeEmpty(customFavsArray)) {
                 let customFavsArray = [...sonosFavsArray]; // copy array
                 if (SORT_LIST) customFavsArray = arraySortCaseInsensitive(customFavsArray);
-                setState(scriptPath(lpChannel) + '.customFavoriteList', customFavsArray.join(';'));                
+                setState(scriptPath(lpChannel) + '.customFavoriteListArray', customFavsArray, true);
             }
 
             // Refresh global HTML playlist initially
@@ -159,7 +162,7 @@ function createStates() {
         createState(scriptPath(lpChannel) + '.sonosFavoritesPlayPrevious', {'name':'Favorites: play previous', 'type':'boolean', 'read':false, 'write':true, 'role':'button', 'def':false });
         createState(scriptPath(lpChannel) + '.customFavoriteAdd', {'name':'Custom Favorites: Add a favorite', 'type':'string', 'read':true, 'write':true, 'role':'state', 'def':'' });
         createState(scriptPath(lpChannel) + '.customFavoriteRemove', {'name':'Custom Favorites: Remove a favorite', 'type':'string', 'read':true, 'write':true, 'role':'state', 'def':'' });
-        createState(scriptPath(lpChannel) + '.customFavoriteList', {'name':'Custom Favorites List', 'type':'string', 'read':true, 'write':true, 'role':'state', 'def':'' });
+        createState(scriptPath(lpChannel) + '.customFavoriteListArray', {'name':'Custom Favorites List Array', 'type':'array', 'read':true, 'write':true, 'role':'state', 'def':'' });
         createState(scriptPath(lpChannel) + '.customFavoriteListHtml', {'name':'Custom Favorites HTML List', 'type':'string', 'read':true, 'write':true, 'role':'media.list', 'def':'' });
         createState(scriptPath(lpChannel) + '.customFavoriteConfigHtml', {'name':'Custom Favorites HTML Configuration', 'type':'string', 'read':true, 'write':true, 'role':'state', 'def':'' });
         createState(scriptPath(lpChannel) + '.customFavoriteToggleConfigVis', {'name':'Custom Favorites: For Vis to toggle config', 'type':'boolean', 'read':true, 'write':true, 'role':'state', 'def':false });
@@ -192,7 +195,7 @@ function subscribeToStates() {
             let channel = getChannel(obj.id);
 
             // Refresh HTML
-            refreshFavoritesHtmlList(channel, getState(sonosPath(channel) + '.favorites_list').val.split(', '), scriptPath(channel) + '.sonosFavoriteListHtml'); // Nun können wir refreshen
+            refreshFavoritesHtmlList(channel, sonosFavoritesArray(channel), scriptPath(channel) + '.sonosFavoriteListHtml'); // Nun können wir refreshen
 
             // Refresh Configuration HTML
             refreshConfigurationHtml(channel);
@@ -207,14 +210,14 @@ function subscribeToStates() {
          */
         on({id: sonosPath(lpChannel) + '.favorites_set', change: 'ne'}, function (obj) {
             let channel = getChannel(obj.id)
-            refreshFavoritesHtmlList(channel, getState(sonosPath(channel) + '.favorites_list').val.split(', '), scriptPath(channel) + '.sonosFavoriteListHtml'); // Nun können wir refreshen
+            refreshFavoritesHtmlList(channel, sonosFavoritesArray(channel), scriptPath(channel) + '.sonosFavoriteListHtml'); // Nun können wir refreshen
         });
 
         /**
          *  Play next Sonos favorite
          */
         on({id: scriptPath(lpChannel) + '.sonosFavoritesPlayNext', change: 'any', val:true}, function (obj) {
-            let favsArray = getState(sonosPath(lpChannel) + '.favorites_list').val.split(', ');
+            let favsArray = sonosFavoritesArray(lpChannel);
             if (FAVORITES_PLAY_PREV_NEXT_SORT) favsArray = arraySortCaseInsensitive(favsArray);
             favoritesPlayNext(lpChannel, favsArray, true);
         });
@@ -223,7 +226,7 @@ function subscribeToStates() {
          *  Play previous Sonos favorite
          */
         on({id: scriptPath(lpChannel) + '.sonosFavoritesPlayPrevious', change: 'any', val:true}, function (obj) {
-            let favsArray = getState(sonosPath(lpChannel) + '.favorites_list').val.split(', ');
+            let favsArray = sonosFavoritesArray(lpChannel);
             if (FAVORITES_PLAY_PREV_NEXT_SORT) favsArray = arraySortCaseInsensitive(favsArray);
             favoritesPlayNext(lpChannel, favsArray, false);
         });
@@ -236,11 +239,11 @@ function subscribeToStates() {
         /**
          * Refresh if the Custom Favorites list changes
          */
-        on({id: scriptPath(lpChannel) + '.customFavoriteList', change: 'ne'}, function (obj) {
+        on({id: scriptPath(lpChannel) + '.customFavoriteListArray', change: 'ne'}, function (obj) {
             let channel = getChannel(obj.id);
 
             // Refresh Custom Favorites HTML List
-            refreshFavoritesHtmlList(channel, getState(scriptPath(channel) + '.customFavoriteList').val.split(';'), scriptPath(channel) + '.customFavoriteListHtml'); // Nun können wir refreshen
+            refreshFavoritesHtmlList(channel, getState(scriptPath(channel) + '.customFavoriteListArray').val, scriptPath(channel) + '.customFavoriteListHtml'); // Nun können wir refreshen
             
             // Refresh Configuration HTML
             refreshConfigurationHtml(channel);
@@ -252,7 +255,7 @@ function subscribeToStates() {
          */
         on({id: sonosPath(lpChannel) + '.favorites_set', change: 'ne'}, function (obj) {
             let channel = getChannel(obj.id);
-            refreshFavoritesHtmlList(channel, getState(scriptPath(lpChannel) + '.customFavoriteList').val.split(';'), scriptPath(channel) + '.customFavoriteListHtml'); // Nun können wir refreshen
+            refreshFavoritesHtmlList(channel, getState(scriptPath(lpChannel) + '.customFavoriteListArray').val, scriptPath(channel) + '.customFavoriteListHtml'); // Nun können wir refreshen
         });
 
 
@@ -264,7 +267,7 @@ function subscribeToStates() {
             if(! isLikeEmpty(obj.state.val)) {
                 customFavoritesAddRemove(lpChannel, obj.state.val, true);
                 if(LOG_INFO) log('[' + obj.state.val + '] added to custom favorite list.');
-                setStateDelayed(obj.id, '', 500);
+                setStateDelayed(obj.id, '', true, 500);
             }
         });
 
@@ -275,7 +278,7 @@ function subscribeToStates() {
             if(! isLikeEmpty(obj.state.val)) {
                 customFavoritesAddRemove(lpChannel, obj.state.val, false);
                 if(LOG_INFO) log('[' + obj.state.val + '] removed from custom favorite list.');
-                setStateDelayed(obj.id, '', 500);
+                setStateDelayed(obj.id, '', true, 500);
             }
         });
 
@@ -283,7 +286,7 @@ function subscribeToStates() {
          *  Play next custom favorite
          */
         on({id: scriptPath(lpChannel) + '.customFavoritesPlayNext', change: 'any', val:true}, function (obj) {
-            let favsArray = getState(scriptPath(lpChannel) + '.customFavoriteList').val.split(';');
+            let favsArray = getState(scriptPath(lpChannel) + '.customFavoriteListArray').val;
             favoritesPlayNext(lpChannel, favsArray, true);
         });
 
@@ -291,7 +294,7 @@ function subscribeToStates() {
          *  Play previous custom favorite
          */
         on({id: scriptPath(lpChannel) + '.customFavoritesPlayPrevious', change: 'any', val:true}, function (obj) {
-            let favsArray = getState(scriptPath(lpChannel) + '.customFavoriteList').val.split(';');
+            let favsArray = getState(scriptPath(lpChannel) + '.customFavoriteListArray').val;
             favoritesPlayNext(lpChannel, favsArray, false);
         });
 
@@ -368,7 +371,7 @@ function subscribeToStates() {
             let channelMain = lpItem['channelMain'];
             on({id: sonosPath(channelMain) + '.state_simple', change: 'any', val:true}, function (obj) {
                 let channel = getChannel(obj.id);
-                groupSonos(channel)
+                groupSonos(channel);
             });
 
         }
@@ -381,7 +384,7 @@ function subscribeToStates() {
         for (let lpChannel of SONOS_CHANNELS) {
             setState(sonosPath(lpChannel) + '.stop', true);
         }
-        setState(obj.id, false); // jetzt Datenpunkt wieder auf false setzen. https://forum.iobroker.net/topic/12708/
+        setState(obj.id, false, true); // jetzt Datenpunkt wieder auf false setzen. https://forum.iobroker.net/topic/12708/
     
     });
 
@@ -394,10 +397,10 @@ function subscribeToStates() {
 function cleanCustomFavoritesList(channel){
 
     // Sonos Favorites in Array
-    let sonosFavsArray = getState(sonosPath(channel) + '.favorites_list').val.split(', ');
+    let sonosFavsArray = sonosFavoritesArray(channel);
 
     // Custom Favorites in Array
-    let customFavsArray = getState(scriptPath(channel) + '.customFavoriteList').val.split(';');
+    let customFavsArray = getState(scriptPath(channel) + '.customFavoriteListArray').val;
 
     // Now remove all items from Custom Favs Array, if not existing in Sonos Favorites
     let resultArray = [];
@@ -407,7 +410,7 @@ function cleanCustomFavoritesList(channel){
         }
     }
 
-    setState(scriptPath(channel) + '.customFavoriteList', resultArray.join(';'));
+    setState(scriptPath(channel) + '.customFavoriteListArray', resultArray, true);
 
 }
 
@@ -419,33 +422,31 @@ function cleanCustomFavoritesList(channel){
  * @param {boolean} add        add if true, or remove, if false
  */
 function customFavoritesAddRemove(channel, favorite, add) {
-    favorite = favorite.replace (/,/g, ''); // Remove any comma from string.
-    let statePth = scriptPath(channel) + '.customFavoriteList';
-    let customFavorites = getState(statePth).val.split(';');
+    // favorite = favorite.replace (/,/g, ''); // Remove any comma from string.  // 12-Sep-2019: removed as Sonos adapter now allows with state favorites_list_array commas as well
+    let statePth = scriptPath(channel) + '.customFavoriteListArray';
+    let customFavorites = getState(statePth).val;
     if (! isLikeEmpty(favorite)) {
         if(add) {
             if (customFavorites.indexOf(favorite) == -1) {
                 // Check if given favorite is member of Sonos favorites.
-                let sonosFavs = getState(sonosPath(channel) + '.favorites_list').val.split(', ');
+                let sonosFavs = sonosFavoritesArray(channel);
                 if (sonosFavs.indexOf(favorite) != -1) {
                     customFavorites.push(favorite);
                     customFavorites = cleanArray(customFavorites); // just in case
                     if (SORT_LIST) customFavorites = arraySortCaseInsensitive(customFavorites);
-                    setState(statePth, customFavorites.join(';'));
+                    setState(statePth, customFavorites, true);
                 }
             }
         } else { // remove
             if (customFavorites.indexOf(favorite) != -1) {
                 customFavorites = arrayRemoveElementsByValue(customFavorites, favorite, true);
                 customFavorites = cleanArray(customFavorites); // just in case
-                setState(statePth, customFavorites.join(';'));
+                setState(statePth, customFavorites, true);  // wegen {"val:..."} siehe https://forum.iobroker.net/topic/14699/array-in-state-speichern/4
             }
         }
 
     }
 }
-
-
 
 
 /***********
@@ -547,9 +548,9 @@ function refreshFavoritesHtmlList(channel, favArray, state) {
 
 function refreshConfigurationHtml(channel) {
     
-    let sonosFavsArray = getState(sonosPath(channel) + '.favorites_list').val.split(', '); // Sonos Favorites in Array
+    let sonosFavsArray = sonosFavoritesArray(channel);
     if (SORT_LIST) sonosFavsArray = arraySortCaseInsensitive(sonosFavsArray);
-    let customFavsArray = getState(scriptPath(channel) + '.customFavoriteList').val.split(';'); // Custom Favorites in Array
+    let customFavsArray = getState(scriptPath(channel) + '.customFavoriteListArray').val;
 
     let favArrayDisplay;
     let htmlResult;
@@ -664,7 +665,7 @@ function favoritesPlayNext(channel, favArray, playNext) {
  */
 function playCustomFavoriteByNumber(channel, favNo) {
     if (favNo == 0) favNo = 1;
-    let customFavorites = getState(scriptPath(channel) + '.customFavoriteList').val.split(';');
+    let customFavorites = getState(scriptPath(channel) + '.customFavoriteListArray').val;
     if (customFavorites[favNo-1] != undefined) {
         setState(sonosPath(channel) + '.favorites_set', customFavorites[favNo-1]);
         if(LOG_INFO) log('Sonos umgeschaltet Favorit ' + favNo + ': ' + customFavorites[favNo-1]);
@@ -672,6 +673,23 @@ function playCustomFavoriteByNumber(channel, favNo) {
         log('Sonos Favorit Nummer ' + favNo + ' wurde nicht gefunden.');
     }
 }
+
+/**
+ * Return the Sonos favorites as array
+ * As of Sonos adapter version 2.0.0 / Pull request 55, there is a new state 'favorites_list_array'
+ * If this state is existing, we use it, instead of favorites_list
+ * @param {string} channel    The channel xx_xx_xx_xx
+ * @return {object} The favorites as array
+ */
+function sonosFavoritesArray(channel) {
+    if (isState('favorites_list_array', true)) {
+        return getState(sonosPath(channel) + '.favorites_list_array').val;
+    } else {
+        return getState(sonosPath(channel) + '.favorites_list').val.split(', ');
+    }
+}
+
+
 
 
 /**
@@ -685,7 +703,7 @@ function sonosStart(channel, volType, volume, position) {
     if (volume === undefined) volume = 15;
     if (position === undefined) position = -1; // No position provided, so we set to -1, to use current pos later
     if (position === 0) position = 1;
-    let customFavorites = getState(scriptPath(channel) + '.customFavoriteList').val.split(';');
+    let customFavorites = getState(scriptPath(channel) + '.customFavoriteListArray').val;
 
     // get current favorite from Sonos Adapter
     let currentFavorite = getState(sonosPath(channel) + '.favorites_set').val;
@@ -772,7 +790,7 @@ function groupSonos(channelMain) {
 /**
  * Get channel from Sonos or Script state.
  * @param {string} state      Sonos State, e.g. sonos.0.root.xx_xx_xx_xx.favorites_set
- *                            Or Scrript state, e.g. javascript.0.Sonos.xx_xx_xx_xx.customFavoriteList
+ *                            Or Scrript state, e.g. javascript.0.Sonos.xx_xx_xx_xx.customFavoriteListArray
  * @return {string} The channel xx_xx_xx_xx
  */
 function getChannel(state) {
@@ -939,4 +957,27 @@ function getConfigValuePerKey(config, key1, key1Value, key2) {
         }
     }
     return -1;
+}
+
+/**
+ * Checks if a a given state or part of state is existing.
+ * This is a workaround, as getObject() or getState() throw warnings in the log.
+ * Set strict to true if the state shall match exactly. If it is false, it will add a wildcard * to the end.
+ * See: https://forum.iobroker.net/topic/11354/
+ * @param {string}    strStatePath     Input string of state, like 'javas-cript.0.switches.Osram.Bedroom'
+ * @param {boolean}   [strict=false]   Optional: if true, it will work strict, if false, it will add a wildcard * to the end of the string
+ * @return {boolean}                   true if state exists, false if not
+ */
+function isState(strStatePath, strict) {
+    let mSelector;
+    if (strict) {
+        mSelector = $('state[id=' + strStatePath + '$]');
+    } else {
+        mSelector = $('state[id=' + strStatePath + ']');
+    }
+    if (mSelector.length > 0) {
+        return true;
+    } else {
+        return false;
+    }
 }
